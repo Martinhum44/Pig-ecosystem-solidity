@@ -91,6 +91,6 @@ contract PiggyTest is Test{
             vm.prank(addr);
             token.wrap{value: 1 ether}();
         }
-        assertEq(address(token).balance, token.totalSupply()+token.feesCollected());
+        assertEq(address(token).balance, token.totalSupply()+token.s_feesCollected());
     }
 }

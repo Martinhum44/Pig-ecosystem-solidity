@@ -33,8 +33,8 @@ interface AggregatorV3Interface {
 }
 
 contract ERC20 is IERC20{
-    mapping(address => uint256) balances;
-    mapping(address => mapping(address => uint256)) allowances;
+    mapping(address => uint256) s_balances;
+    mapping(address => mapping(address => uint256)) s_allowances;
     
     string s_name;
     string s_symb; 
@@ -64,33 +64,33 @@ contract ERC20 is IERC20{
     }
 
     function transfer(address recipient, uint amount) external virtual returns(bool){
-        balances[recipient] += amount;
-        balances[msg.sender] -= amount;
+        s_balances[recipient] += amount;
+        s_balances[msg.sender] -= amount;
         emit Transfer(msg.sender,recipient,amount);
         return true;
     }
 
     function approve(address spender, uint256 amount) external returns (bool){
-        allowances[msg.sender][spender] += amount;
+        s_allowances[msg.sender][spender] += amount;
         emit Approval(msg.sender, spender, amount);
         return true;
     }
 
     function allowance(address owner, address spender) public view returns (uint256){
-        return allowances[owner][spender];
+        return s_allowances[owner][spender];
     }
 
     function transferFrom(address sender, address recipient, uint256 amount) external virtual returns (bool){
         require(allowance(sender, msg.sender) >= amount, "allowance less than amount");
-        balances[sender] -= amount;
-        balances[recipient] += amount;
-        allowances[sender][msg.sender] -= amount;
+        s_balances[sender] -= amount;
+        s_balances[recipient] += amount;
+        s_allowances[sender][msg.sender] -= amount;
         emit Transfer(sender,recipient,amount);
         return true;
     }
 
     function balanceOf(address account) public view returns(uint){
-        return balances[account];
+        return s_balances[account];
     }
 }
 
@@ -113,7 +113,7 @@ contract PiggyBankShares is ERC20{
     mapping(address => mapping(uint => bool)) voted;
 
     constructor(address to) ERC20("Piggy Bank Shares", "PBS"){
-        balances[to] = 20;
+        s_balances[to] = 20;
         i_owner = payable(to);
     }
 
@@ -125,7 +125,7 @@ contract PiggyBankShares is ERC20{
         require(s_sharesToSell > 0, "No more shares can be bought.");
         require(msg.value >= 0.01e15, "You can't even buy 1 share!");
         require(msg.value <= 0.01e15*uint(s_sharesToSell), "You can't buy that amount of shares. (They ran out)");
-        balances[msg.sender] += uint8(msg.value/0.01e15);
+        s_balances[msg.sender] += uint8(msg.value/0.01e15);
         s_shareHolders.push(msg.sender);
         s_sharesToSell -= uint8(msg.value/0.01e15);
     } 
@@ -158,8 +158,8 @@ contract PiggyBankShares is ERC20{
         trans.votes += balanceOf(msg.sender);
         voted[msg.sender][transaction] = true;
         if(trans.votes >= 70){
-            balances[trans.from] -= trans.value;
-            balances[trans.to] += trans.value;
+            s_balances[trans.from] -= trans.value;
+            s_balances[trans.to] += trans.value;
             trans.approved = true;
         }
     }
@@ -167,7 +167,7 @@ contract PiggyBankShares is ERC20{
 
 contract PiggyBankOneToOne is ERC20{
     PiggyBankShares public immutable shareProvider;
-    uint public feesCollected;
+    uint public s_feesCollected;
     address public immutable owner;
 
     constructor(address _owner) ERC20("PiggyBankOneToOne", "PIGGY1T1") { 
@@ -178,16 +178,16 @@ contract PiggyBankOneToOne is ERC20{
     function wrap() external payable {
         require(shareProvider.s_sharesToSell() == 0, "Investors must have finished investing.");
         uint fee = (msg.value/100);
-        balances[msg.sender] += msg.value - fee;
-        feesCollected += fee;
+        s_balances[msg.sender] += msg.value - fee;
+        s_feesCollected += fee;
         s_totalsupply += msg.value - fee;
     }
 
     function unwrap(uint amount) external {
         uint fee = (amount/100);
-        balances[msg.sender] -= amount;
+        s_balances[msg.sender] -= amount;
         payable(msg.sender).transfer(amount - fee);
-        feesCollected += fee;
+        s_feesCollected += fee;
         s_totalsupply -= amount;
     }
 
@@ -196,9 +196,9 @@ contract PiggyBankOneToOne is ERC20{
         address[] memory holders = shareProvider.returnShareHolders();
         uint len = holders.length;
         for(uint i = 0; i < len; i++){
-            payable(holders[i]).transfer((feesCollected/100)*shareProvider.balanceOf(holders[i]));
+            payable(holders[i]).transfer((s_feesCollected/100)*shareProvider.balanceOf(holders[i]));
         }
-        feesCollected = 0;
+        s_feesCollected = 0;
     } 
 }
 
