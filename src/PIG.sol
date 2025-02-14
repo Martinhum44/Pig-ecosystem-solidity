@@ -97,7 +97,7 @@ contract ERC20 is IERC20{
 contract PiggyBankShares is ERC20{
     uint8 public s_sharesToSell = 80; 
     uint8 constant TOTAL_SHARES = 100;
-    address payable immutable i_owner;
+    address payable public immutable i_owner;
     address[] public s_shareHolders;
     uint count;
 
