@@ -36,21 +36,22 @@ contract ERC20 is IERC20{
     mapping(address => uint256) balances;
     mapping(address => mapping(address => uint256)) allowances;
     
-    string i_name;
-    string i_symb; 
-    uint public totalsupply;
+    string s_name;
+    string s_symb; 
+
+    uint public s_totalsupply;
 
     constructor(string memory _name, string memory _symbol){
-        i_name = _name;
-        i_symb = _symbol;
+        s_name = _name;
+        s_symb = _symbol;
     }
 
     function name() external view returns(string memory){
-        return i_name;
+        return s_name;
     }
 
     function symbol() external view returns(string memory){
-        return i_symb;
+        return s_symb;
     }
 
 
@@ -59,7 +60,7 @@ contract ERC20 is IERC20{
     }
 
     function totalSupply() external view returns(uint){
-        return totalsupply;
+        return s_totalsupply;
     }
 
     function transfer(address recipient, uint amount) external virtual returns(bool){
@@ -94,10 +95,10 @@ contract ERC20 is IERC20{
 }
 
 contract PiggyBankShares is ERC20{
-    uint8 public sharesToSell = 80; 
+    uint8 public s_sharesToSell = 80; 
     uint8 constant TOTAL_SHARES = 100;
-    address payable owner;
-    address[] public shareHolders;
+    address payable immutable i_owner;
+    address[] public s_shareHolders;
     uint count;
 
     struct Transfers {
@@ -113,7 +114,7 @@ contract PiggyBankShares is ERC20{
 
     constructor(address to) ERC20("Piggy Bank Shares", "PBS"){
         balances[to] = 20;
-        owner = payable(to);
+        i_owner = payable(to);
     }
 
     function decimals() public pure override returns(uint8){
@@ -121,21 +122,21 @@ contract PiggyBankShares is ERC20{
     }
 
     function invest() external payable {
-        require(sharesToSell > 0, "No more shares can be bought.");
+        require(s_sharesToSell > 0, "No more shares can be bought.");
         require(msg.value >= 0.01e15, "You can't even buy 1 share!");
-        require(msg.value <= 0.01e15*uint(sharesToSell), "You can't buy that amount of shares. (They ran out)");
+        require(msg.value <= 0.01e15*uint(s_sharesToSell), "You can't buy that amount of shares. (They ran out)");
         balances[msg.sender] += uint8(msg.value/0.01e15);
-        shareHolders.push(msg.sender);
-        sharesToSell -= uint8(msg.value/0.01e15);
+        s_shareHolders.push(msg.sender);
+        s_sharesToSell -= uint8(msg.value/0.01e15);
     } 
 
     function recolectShareSales() external {
-        require(msg.sender == owner);
-        owner.transfer(address(this).balance);
+        require(msg.sender == i_owner);
+        i_owner.transfer(address(this).balance);
     }
 
     function returnShareHolders() external view returns(address[] memory){
-        return shareHolders;
+        return s_shareHolders;
     }
 
     function transfer(address recipient, uint amount) external override returns(bool){
@@ -175,10 +176,11 @@ contract PiggyBankOneToOne is ERC20{
     }
 
     function wrap() external payable {
-        require(shareProvider.sharesToSell() == 0, "Investors must have finished investing.");
+        require(shareProvider.s_sharesToSell() == 0, "Investors must have finished investing.");
         uint fee = (msg.value/100);
         balances[msg.sender] += msg.value - fee;
         feesCollected += fee;
+        s_totalsupply += msg.value - fee;
     }
 
     function unwrap(uint amount) external {
@@ -186,6 +188,7 @@ contract PiggyBankOneToOne is ERC20{
         balances[msg.sender] -= amount;
         payable(msg.sender).transfer(amount - fee);
         feesCollected += fee;
+        s_totalsupply -= amount;
     }
 
     function distributeRewards() external {
@@ -209,16 +212,16 @@ library USDConversions {
 
 contract PiggyBankFactory {
     mapping(address => address[]) public piggyBanks;
-    PiggyBankOneToOne public immutable token;
-    address immutable public priceFeed;
+    PiggyBankOneToOne public immutable i_token;
+    address immutable public i_priceFeed;
 
     constructor(address _priceFeed) {
-        token = new PiggyBankOneToOne(msg.sender);
-        priceFeed = _priceFeed;
+        i_token = new PiggyBankOneToOne(msg.sender);
+        i_priceFeed = _priceFeed;
     }
 
     function createPiggyBank(uint goalInUSDCents, address destinationWhenGoalMet) external returns(PiggyBank){
-        PiggyBank np = new PiggyBank(priceFeed, token, goalInUSDCents, destinationWhenGoalMet);
+        PiggyBank np = new PiggyBank(i_priceFeed, i_token, goalInUSDCents, destinationWhenGoalMet);
         piggyBanks[msg.sender].push(address(np));
         return np;
     }
@@ -229,12 +232,12 @@ contract PiggyBank {
 
     uint public immutable goal;
     address public immutable recipient;
-    bool reached;
+    bool s_reached;
     PiggyBankOneToOne public immutable oneToOneToken;
     AggregatorV3Interface public immutable priceFeed;
 
     modifier NotGreaterThanGoal{
-        require(!reached, "goal already reached");
+        require(!s_reached, "goal already reached");
         _;
     }
 
@@ -253,7 +256,7 @@ contract PiggyBank {
         oneToOneToken.transferFrom(msg.sender, address(this), amount);
         if(getBalanceInUsd() > int(goal)){
             oneToOneToken.transfer(recipient, oneToOneToken.balanceOf(address(this)));
-            reached = true;
+            s_reached = true;
         }
     }
 
@@ -261,7 +264,7 @@ contract PiggyBank {
         oneToOneToken.wrap{value:msg.value}();
         if(getBalanceInUsd() > int(goal)){
             oneToOneToken.transfer(recipient, oneToOneToken.balanceOf(address(this)));
-            reached = true;
+            s_reached = true;
         }
     }
 }

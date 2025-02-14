@@ -23,7 +23,7 @@ contract PiggyTest is Test{
     function setUp() external {
         dp = new DeployPig();
         piggyBankFactory = dp.run();
-        token = piggyBankFactory.token();
+        token = piggyBankFactory.i_token();
         shareProvider = token.shareProvider();
         vm.deal(inv1, INVESTOR_BALANCE);
         vm.deal(inv2, INVESTOR_BALANCE);
@@ -32,11 +32,11 @@ contract PiggyTest is Test{
     }
 
     function testOwnerIsMsgSender() external view {
-        assertEq(PiggyBankOneToOne(piggyBankFactory.token()).owner(), msg.sender);
+        assertEq(PiggyBankOneToOne(piggyBankFactory.i_token()).owner(), msg.sender);
     }
 
     function testPriceFeedFunctionIsAccurate() external view {
-        assertEq(AggregatorV3Interface(piggyBankFactory.priceFeed()).version(), 4);
+        assertEq(AggregatorV3Interface(piggyBankFactory.i_priceFeed()).version(), 4);
     }
 
     function testRevertWhenNotFinishedInvesting() external {
@@ -81,5 +81,16 @@ contract PiggyTest is Test{
         require(success);
         require(token.balanceOf(reciever) > 0.9 ether);
         assertEq(true, true);
+    }
+
+    function testTokenBalanceOfTokenContractMinusFeeEqualToTotalSupply() external {
+        shareProvider.invest{value: 0.8e15}();
+        for(uint i = 0; i < 10; i++){
+            address addr = makeAddr(string(abi.encodePacked("wrapper", i)));
+            vm.deal(addr, 1 ether);
+            vm.prank(addr);
+            token.wrap{value: 1 ether}();
+        }
+        assertEq(address(token).balance, token.totalSupply()+token.feesCollected());
     }
 }
